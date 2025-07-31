@@ -10,15 +10,42 @@ CHAT_ID = os.environ.get('CHAT_ID')
 @app.route('/', methods=['POST'])
 def tinkoff_webhook():
     data = request.get_json()
-    if data and data.get('Success') is True:
-        order_id = data.get('OrderId', '')
-        amount = data.get('Amount', 0) / 100
-        email = data.get('Email', '')
-        message = f"✅ Оплата прошла!\n🧾 Заказ: {order_id}\n💳 Сумма: {amount} ₽\n📧 {email}"
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={'chat_id': CHAT_ID, 'text': message}
+    print("Получен вебхук:", data)  # Для отладки в Render
+
+    if not data:
+        return 'Нет данных', 400
+
+    order_id = data.get('OrderId', '—')
+    amount = data.get('Amount', 0) / 100
+    email = data.get('Email', '—')
+    status = data.get('Status', '')
+    success = data.get('Success', False)
+
+    if success and status == 'CONFIRMED':
+        message = (
+            f"✅ Оплата прошла успешно!\n"
+            f"🧾 Заказ: {order_id}\n"
+            f"💳 Сумма: {amount} ₽\n"
+            f"📧 Email: {email}"
         )
+    elif not success:
+        reason = data.get('Message', 'Причина не указана')
+        message = (
+            f"❌ Платёж отклонён!\n"
+            f"🧾 Заказ: {order_id}\n"
+            f"💳 Сумма: {amount} ₽\n"
+            f"📧 Email: {email}\n"
+            f"🚫 Причина: {reason}"
+        )
+    else:
+        return 'Не обрабатываемый статус', 200
+
+    # Отправка сообщения в Telegram
+    requests.post(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        data={'chat_id': CHAT_ID, 'text': message}
+    )
+
     return 'OK', 200
 
 if __name__ == "__main__":
