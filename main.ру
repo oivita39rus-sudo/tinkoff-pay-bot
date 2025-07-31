@@ -1,7 +1,6 @@
 from flask import Flask, request
 import os
 import requests
-import json
 
 app = Flask(__name__)
 
@@ -11,45 +10,42 @@ CHAT_ID = os.environ.get('CHAT_ID')
 @app.route('/', methods=['POST'])
 def tinkoff_webhook():
     data = request.get_json()
+    
+    # 🔍 Отладочный вывод в лог Render
+    print("[DEBUG] Получены данные от Тинькофф:")
+    print(data)
 
     if not data:
         return 'No data', 400
 
-    # 🔹 ВРЕМЕННО: отправим полный JSON в Telegram
-    debug_message = f"📦 Данные от Тинькофф:\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
-    requests.post(
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        data={'chat_id': CHAT_ID, 'text': debug_message, 'parse_mode': 'Markdown'}
-    )
-
-    # Далее обычная логика
     order_id = data.get('OrderId', 'не указан')
     amount = data.get('Amount', 0) / 100
     email = data.get('Email', 'не указан')
     status = data.get('Status', 'UNKNOWN')
-    success = data.get('Success', None)
+    success = data.get('Success', False)
 
     if success is True:
         message = (
             f"✅ Оплата прошла успешно!\n"
             f"🧾 Заказ: {order_id}\n"
-            f"💳 Сумма: {amount} ₽\n"
+            f"💳 Сумма: {amount:.2f} ₽\n"
             f"📧 Email: {email}"
         )
     else:
-        reason = data.get('Message') or data.get('Details') or "Причина не указана"
+        reason = data.get('Message') or "Причина не указана"
         message = (
-            f"❌ Оплата не прошла или отменена!\n"
+            f"❌ Оплата не прошла!\n"
             f"🧾 Заказ: {order_id}\n"
-            f"💳 Сумма: {amount} ₽\n"
+            f"💳 Сумма: {amount:.2f} ₽\n"
             f"📧 Email: {email}\n"
             f"📌 Статус: {status}\n"
             f"⚠️ Причина: {reason}"
         )
 
+    # Отправка в Telegram
     requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        data={'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'Markdown'}
+        data={'chat_id': CHAT_ID, 'text': message}
     )
 
     return 'OK', 200
