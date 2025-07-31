@@ -1,6 +1,7 @@
 from flask import Flask, request
 import os
 import requests
+import json
 
 app = Flask(__name__)
 
@@ -14,14 +15,20 @@ def tinkoff_webhook():
     if not data:
         return 'No data', 400
 
-    # Извлекаем основные поля
+    # 🔹 ВРЕМЕННО: отправим полный JSON в Telegram
+    debug_message = f"📦 Данные от Тинькофф:\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
+    requests.post(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        data={'chat_id': CHAT_ID, 'text': debug_message, 'parse_mode': 'Markdown'}
+    )
+
+    # Далее обычная логика
     order_id = data.get('OrderId', 'не указан')
     amount = data.get('Amount', 0) / 100
     email = data.get('Email', 'не указан')
     status = data.get('Status', 'UNKNOWN')
-    success = data.get('Success', None)  # может быть True, False или отсутствовать
+    success = data.get('Success', None)
 
-    # Оплата прошла
     if success is True:
         message = (
             f"✅ Оплата прошла успешно!\n"
@@ -29,7 +36,6 @@ def tinkoff_webhook():
             f"💳 Сумма: {amount} ₽\n"
             f"📧 Email: {email}"
         )
-    # Оплата не прошла или отменена
     else:
         reason = data.get('Message') or data.get('Details') or "Причина не указана"
         message = (
@@ -41,7 +47,6 @@ def tinkoff_webhook():
             f"⚠️ Причина: {reason}"
         )
 
-    # Отправка в Telegram
     requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
         data={'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'Markdown'}
